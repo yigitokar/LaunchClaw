@@ -3,31 +3,21 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
 
-from app.auth import get_current_user_id, verify_internal_service
+from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.routers._helpers import record_activity_event, verify_claw_ownership
-from app.services.scheduler import utc_now
 
 router = APIRouter(tags=["integrations"])
 
 INTEGRATION_RESPONSE_FIELDS = "id, claw_id, provider, status, scope_summary, metadata, created_at, updated_at"
 GITHUB_SCOPE_SUMMARY = "repo metadata, pull requests, contents"
 STATE_TTL_SECONDS = 600
-
-
-class InternalGitHubTokenRequest(BaseModel):
-    claw_id: str
-    integration_id: str
-    repositories: list[str] = Field(default_factory=list)
-    permissions: dict[str, str] = Field(default_factory=dict)
 
 
 def _encode_token_bytes(value: bytes) -> str:
@@ -262,24 +252,3 @@ async def refresh_integration(
         .execute()
     )
     return result.data[0]
-
-
-@router.post("/internal/integrations/github/token")
-async def mint_github_token(
-    body: InternalGitHubTokenRequest,
-    _: None = Depends(verify_internal_service),
-) -> dict[str, str]:
-    integration = get_integration_for_claw(body.claw_id, body.integration_id)
-    if integration["provider"] != "github":
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "invalid_provider", "message": "Integration is not a GitHub integration"},
-        )
-    if integration["status"] != "connected":
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "integration_not_connected", "message": "Integration is not connected"},
-        )
-
-    expires_at = (utc_now() + timedelta(hours=1)).isoformat()
-    return {"token": "ghs_placeholder", "expires_at": expires_at}
