@@ -389,6 +389,85 @@ code {
   border-color: var(--accent);
 }
 
+.settings-stack,
+.settings-section {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-section-header h3 {
+  margin: 0 0 4px;
+}
+
+.settings-actions,
+.schedule-form-actions,
+.schedule-card-footer,
+.schedule-card-header,
+.schedule-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-form,
+.schedule-list {
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.schedule-editor-grid,
+.schedule-meta-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.schedule-field,
+.schedule-meta-item {
+  display: grid;
+  gap: 6px;
+}
+
+.schedule-field span,
+.schedule-meta-item span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.schedule-meta-item strong {
+  font-weight: 600;
+}
+
+.settings-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.settings-feedback {
+  margin: 0;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
 /* Work and activity */
 .section-divider {
   margin: 24px 0;
@@ -659,7 +738,13 @@ code {
   .run-form-footer,
   .load-more-row,
   .run-card-header,
-  .activity-header {
+  .activity-header,
+  .settings-section-header,
+  .settings-actions,
+  .schedule-form-actions,
+  .schedule-card-footer,
+  .schedule-card-header,
+  .schedule-card-title {
     flex-direction: column;
     align-items: flex-start;
   }
