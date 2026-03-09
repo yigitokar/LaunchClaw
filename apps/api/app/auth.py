@@ -1,5 +1,6 @@
 from fastapi import Header, HTTPException
 
+from app.config import settings
 from app.db import get_supabase
 
 
@@ -14,3 +15,11 @@ async def get_current_user_id(authorization: str = Header(...)) -> str:
         raise HTTPException(status_code=401, detail="unauthorized")
 
     return resp.user.id
+
+
+async def verify_internal_service(
+    x_internal_token: str | None = Header(None, alias="X-Internal-Token"),
+) -> None:
+    expected = settings.internal_service_token
+    if not expected or x_internal_token != expected:
+        raise HTTPException(status_code=401, detail="unauthorized")
