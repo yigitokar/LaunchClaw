@@ -6,6 +6,7 @@ from app.config import settings
 from app.db import get_supabase
 from app.routers.activity import router as activity_router
 from app.routers.claws import router as claws_router
+from app.routers.integrations import router as integrations_router
 from app.routers.internal import router as internal_router
 from app.routers.lifecycle import router as lifecycle_router
 from app.routers.runs import router as runs_router
@@ -33,6 +34,7 @@ app.include_router(runs_router)
 app.include_router(schedules_router)
 app.include_router(activity_router)
 app.include_router(workspace_files_router)
+app.include_router(integrations_router)
 app.include_router(internal_router)
 
 
