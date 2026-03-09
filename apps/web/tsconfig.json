@@ -6,6 +6,10 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "allowJs": false,
     "incremental": true,
     "noEmit": true
