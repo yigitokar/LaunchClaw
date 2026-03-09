@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
+from app.routers.claws import router as claws_router
 
 
 app = FastAPI(
@@ -19,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(claws_router)
 
 
 @app.get("/healthz")
