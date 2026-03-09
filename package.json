@@ -1,0 +1,20 @@
+{
+  "name": "launchclaw",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.3",
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @launchclaw/web",
+    "build:web": "npm run build --workspace @launchclaw/web",
+    "typecheck:web": "npm run typecheck --workspace @launchclaw/web"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
+}
+
