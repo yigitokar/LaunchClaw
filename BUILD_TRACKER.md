@@ -1,7 +1,7 @@
 # LaunchClaw Build Tracker
 
 ## Current Phase
-Phase 3 — Workspace Shell & Files (PR #3 open)
+Phase 6 — GitHub Integration
 
 ## Build Order (from PRD)
 
@@ -20,7 +20,7 @@ Phase 3 — Workspace Shell & Files (PR #3 open)
 - [x] Build Create Claw wizard UI (preset selection, name, model access mode)
 - [x] Build Claw overview card in Launch Console
 
-### Phase 3: Workspace Shell & Files (PR #3 open)
+### Phase 3: Workspace Shell & Files ✅ (PR #3, merged 2026-03-09)
 - [x] Build workspace layout with sidebar nav (work/files/activity/settings tabs)
 - [x] GET /api/claws/:id/workspace/files — list files
 - [x] GET /api/claws/:id/workspace/files/content — get file content
@@ -28,21 +28,21 @@ Phase 3 — Workspace Shell & Files (PR #3 open)
 - [x] Build Files tab UI with editor
 - [x] Build Settings tab UI
 
-### Phase 4: Runs & Activity
-- [ ] POST /api/claws/:id/runs — create manual run
-- [ ] GET /api/claws/:id/runs — list runs
-- [ ] GET /api/runs/:id — run detail
-- [ ] Build Work tab UI (input + run history)
-- [ ] Build Activity tab UI (event feed)
-- [ ] GET /api/claws/:id/activity — activity feed endpoint
+### Phase 4: Runs & Activity ✅ (implemented in earlier PRs, verified 2026-03-09)
+- [x] POST /api/claws/:id/runs — create manual run
+- [x] GET /api/claws/:id/runs — list runs
+- [x] GET /api/runs/:id — run detail
+- [x] Build Work tab UI (input + run history)
+- [x] Build Activity tab UI (event feed)
+- [x] GET /api/claws/:id/activity — activity feed endpoint
 
-### Phase 5: Lifecycle & Scheduling
-- [ ] POST pause/resume/restart/recover endpoints
-- [ ] Lifecycle state machine enforcement
-- [ ] CRUD for schedules
-- [ ] Schedule toggle endpoint
-- [ ] Scheduler service (scan due, create runs)
-- [ ] Scheduling UI in workspace settings
+### Phase 5: Lifecycle & Scheduling ✅ (PR #5, open 2026-03-09)
+- [x] POST pause/resume/restart/recover endpoints
+- [x] Lifecycle state machine enforcement
+- [x] CRUD for schedules
+- [x] Schedule toggle endpoint
+- [x] Scheduler service (scan due, create runs)
+- [x] Scheduling UI in workspace settings
 
 ### Phase 6: GitHub Integration
 - [ ] GitHub App setup docs
@@ -70,7 +70,8 @@ Phase 3 — Workspace Shell & Files (PR #3 open)
 ## Completed Tasks
 - Phase 1: Data Model & Auth Foundation — PR #1, merged 2026-03-09
 - Phase 2: Claw CRUD & Create Flow — PR #2, merged 2026-03-09
-- Phase 3: Workspace Shell & Files — PR #3, opened 2026-03-09
+- Phase 3: Workspace Shell & Files — PR #3, merged 2026-03-09
+- Phase 5: Lifecycle & Scheduling — PR #5, open 2026-03-09
 
 ## Notes
 - FastAPI backend (apps/api) — Python
