@@ -29,6 +29,8 @@ const EVENT_META: Record<string, { glyph: string; label: string }> = {
   claw_restarted: { glyph: "CR", label: "Claw restarted" },
   integration_connected: { glyph: "IC", label: "Integration connected" },
   integration_degraded: { glyph: "ID", label: "Integration degraded" },
+  integration_disconnected: { glyph: "IX", label: "Integration disconnected" },
+  integration_refreshed: { glyph: "IR", label: "Integration refreshed" },
   run_failed: { glyph: "RF", label: "Run failed" },
   run_started: { glyph: "RS", label: "Run started" },
   run_succeeded: { glyph: "RO", label: "Run succeeded" },

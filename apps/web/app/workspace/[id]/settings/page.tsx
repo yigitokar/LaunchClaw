@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ShellCard } from "@launchclaw/ui";
 import { apiFetch } from "@/lib/api";
@@ -16,6 +16,8 @@ type ClawDetail = {
 
 export default function WorkspaceSettingsPage() {
   const { id: clawId } = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [claw, setClaw] = useState<ClawDetail | null>(null);
   const [nameValue, setNameValue] = useState("");
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,14 @@ export default function WorkspaceSettingsPage() {
   useEffect(() => {
     loadClaw();
   }, [loadClaw]);
+
+  useEffect(() => {
+    if (searchParams.get("integration") !== "success") {
+      return;
+    }
+
+    router.replace(`/workspace/${clawId}/integrations?integration=success`);
+  }, [clawId, router, searchParams]);
 
   const handleSaveName = async () => {
     if (!nameValue.trim()) return;

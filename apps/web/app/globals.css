@@ -512,6 +512,22 @@ code {
   color: #24652a;
 }
 
+.run-badge--status-connected {
+  background: rgba(46, 125, 50, 0.14);
+  color: #24652a;
+}
+
+.run-badge--status-degraded {
+  background: rgba(196, 85, 40, 0.12);
+  color: #9a461f;
+}
+
+.run-badge--status-disconnected,
+.run-badge--status-revoked {
+  background: rgba(31, 44, 55, 0.08);
+  color: var(--muted);
+}
+
 .run-badge--status-failed,
 .run-badge--status-cancelled {
   background: rgba(196, 85, 40, 0.12);
@@ -613,6 +629,47 @@ code {
   cursor: default;
 }
 
+.integration-toolbar,
+.integration-card-header,
+.integration-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.integration-list {
+  display: grid;
+  gap: 16px;
+}
+
+.integration-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.integration-summary {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.integration-actions {
+  justify-content: flex-start;
+}
+
+.integration-toast {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(46, 125, 50, 0.12);
+  color: #24652a;
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 24px 16px 64px;
@@ -659,7 +716,10 @@ code {
   .run-form-footer,
   .load-more-row,
   .run-card-header,
-  .activity-header {
+  .activity-header,
+  .integration-toolbar,
+  .integration-card-header,
+  .integration-actions {
     flex-direction: column;
     align-items: flex-start;
   }
