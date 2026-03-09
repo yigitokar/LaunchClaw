@@ -3,23 +3,9 @@ from pydantic import BaseModel, Field
 
 from app.auth import get_current_user_id
 from app.db import get_supabase
+from app.routers._helpers import verify_claw_ownership
 
 router = APIRouter(prefix="/api/claws/{claw_id}/workspace/files", tags=["workspace-files"])
-
-
-def _verify_claw_ownership(claw_id: str, user_id: str) -> None:
-    """Raise 404 if the claw doesn't exist or isn't owned by the user."""
-    supabase = get_supabase()
-    result = (
-        supabase.table("claws")
-        .select("id")
-        .eq("id", claw_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Claw not found"})
 
 
 @router.get("")
@@ -27,7 +13,7 @@ async def list_files(
     claw_id: str,
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    _verify_claw_ownership(claw_id, user_id)
+    verify_claw_ownership(claw_id, user_id)
     supabase = get_supabase()
     result = (
         supabase.table("workspace_files")
@@ -45,7 +31,7 @@ async def get_file_content(
     path: str = Query(..., min_length=1),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    _verify_claw_ownership(claw_id, user_id)
+    verify_claw_ownership(claw_id, user_id)
     supabase = get_supabase()
     result = (
         supabase.table("workspace_files")
@@ -80,7 +66,7 @@ async def update_file_content(
     body: UpdateFileRequest,
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    _verify_claw_ownership(claw_id, user_id)
+    verify_claw_ownership(claw_id, user_id)
     supabase = get_supabase()
 
     # Fetch current file to check version

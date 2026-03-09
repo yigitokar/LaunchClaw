@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import get_current_user_id
 from app.db import get_supabase
+from app.routers._helpers import record_activity_event
 
 router = APIRouter(prefix="/api/claws", tags=["claws"])
 
@@ -91,6 +92,17 @@ async def create_claw(
 
     if seed_files:
         supabase.table("workspace_files").insert(seed_files).execute()
+
+    record_activity_event(
+        claw_id=claw["id"],
+        event_type="claw_created",
+        summary="Claw created",
+        metadata={
+            "status": claw["status"],
+            "preset_id": claw["preset_id"],
+            "model_access_mode": claw["model_access_mode"],
+        },
+    )
 
     return claw
 

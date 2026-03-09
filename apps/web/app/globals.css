@@ -389,6 +389,230 @@ code {
   border-color: var(--accent);
 }
 
+/* Work and activity */
+.section-divider {
+  margin: 24px 0;
+  border-top: 1px solid var(--line);
+}
+
+.run-form {
+  display: grid;
+  gap: 12px;
+}
+
+.run-form-label {
+  font-weight: 600;
+}
+
+.run-input {
+  min-height: 140px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.run-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.run-form-footer,
+.load-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-list,
+.activity-feed {
+  display: grid;
+  gap: 14px;
+}
+
+.run-card,
+.activity-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.run-card--expanded {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.run-card-toggle {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.run-card-header,
+.activity-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+
+.run-badge--trigger {
+  background: rgba(14, 124, 134, 0.1);
+  color: var(--accent-strong);
+}
+
+.run-badge--approval {
+  background: rgba(196, 85, 40, 0.12);
+  color: #9a461f;
+}
+
+.run-badge--status-queued {
+  background: rgba(31, 44, 55, 0.08);
+  color: var(--muted);
+}
+
+.run-badge--status-running,
+.run-badge--status-waiting-approval {
+  background: rgba(14, 124, 134, 0.14);
+  color: var(--accent-strong);
+}
+
+.run-badge--status-succeeded {
+  background: rgba(46, 125, 50, 0.14);
+  color: #24652a;
+}
+
+.run-badge--status-failed,
+.run-badge--status-cancelled {
+  background: rgba(196, 85, 40, 0.12);
+  color: #9a461f;
+}
+
+.run-card-indicator,
+.activity-time {
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.run-summary,
+.activity-summary {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.run-detail {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.run-detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.run-detail-item {
+  display: grid;
+  gap: 4px;
+}
+
+.activity-card {
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+}
+
+.activity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(14, 124, 134, 0.1);
+  color: var(--accent-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.activity-body,
+.activity-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-meta-chip,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.secondary-button {
+  cursor: pointer;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: rgba(14, 124, 134, 0.28);
+  color: var(--accent-strong);
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 24px 16px 64px;
@@ -431,5 +655,16 @@ code {
     padding-right: 0;
     padding-bottom: 12px;
   }
-}
 
+  .run-form-footer,
+  .load-more-row,
+  .run-card-header,
+  .activity-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .activity-card {
+    grid-template-columns: 1fr;
+  }
+}
