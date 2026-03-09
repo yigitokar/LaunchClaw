@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
+from app.routers.activity import router as activity_router
 from app.routers.claws import router as claws_router
+from app.routers.runs import router as runs_router
 from app.routers.workspace_files import router as workspace_files_router
 
 
@@ -23,6 +25,8 @@ app.add_middleware(
 )
 
 app.include_router(claws_router)
+app.include_router(runs_router)
+app.include_router(activity_router)
 app.include_router(workspace_files_router)
 
 
