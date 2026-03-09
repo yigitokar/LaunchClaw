@@ -5,6 +5,7 @@ from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.routers.claws import router as claws_router
+from app.routers.workspace_files import router as workspace_files_router
 
 
 app = FastAPI(
@@ -22,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(claws_router)
+app.include_router(workspace_files_router)
 
 
 @app.get("/healthz")

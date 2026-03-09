@@ -1,34 +1,54 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { use } from "react";
 import { WORKSPACE_TABS } from "@launchclaw/types";
 
-export default async function WorkspaceLayout({
+const TAB_ICONS: Record<string, string> = {
+  work: "W",
+  files: "F",
+  activity: "A",
+  integrations: "I",
+  settings: "S",
+};
+
+export default function WorkspaceLayout({
   children,
   params,
 }: {
   children: ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id } = use(params);
+  const pathname = usePathname();
+
+  const activeTab = WORKSPACE_TABS.find((tab) => pathname.includes(`/${tab}`)) || "work";
 
   return (
-    <main className="app-shell stack">
-      <section className="hero">
-        <span className="eyebrow">Workspace</span>
-        <h1>{id}</h1>
-        <p>Thin workspace shell with the tabs defined in the PRD.</p>
-      </section>
-
-      <nav className="nav-row">
-        {WORKSPACE_TABS.map((tab) => (
-          <Link className="nav-link" href={`/workspace/${id}/${tab}`} key={tab}>
-            {tab}
+    <div className="workspace-layout">
+      <aside className="workspace-sidebar">
+        <div className="sidebar-header">
+          <Link href="/dashboard" className="sidebar-back">
+            &larr;
           </Link>
-        ))}
-      </nav>
-
-      {children}
-    </main>
+          <span className="sidebar-title">Workspace</span>
+        </div>
+        <nav className="sidebar-nav">
+          {WORKSPACE_TABS.map((tab) => (
+            <Link
+              className={`sidebar-link ${activeTab === tab ? "sidebar-link--active" : ""}`}
+              href={`/workspace/${id}/${tab}`}
+              key={tab}
+            >
+              <span className="sidebar-icon">{TAB_ICONS[tab]}</span>
+              <span className="sidebar-label">{tab}</span>
+            </Link>
+          ))}
+        </nav>
+      </aside>
+      <main className="workspace-main">{children}</main>
+    </div>
   );
 }
-
