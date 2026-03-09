@@ -395,6 +395,74 @@ code {
   gap: 16px;
 }
 
+.integration-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.integration-hero,
+.integration-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.integration-hero {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.integration-header,
+.integration-title,
+.integration-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.integration-title {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.integration-title h3 {
+  margin: 0;
+}
+
+.integration-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.integration-summary {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.integration-meta-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.integration-meta-item {
+  display: grid;
+  gap: 6px;
+}
+
+.integration-meta-item span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.integration-meta-item strong {
+  font-weight: 600;
+}
+
 .settings-section-header {
   display: flex;
   align-items: flex-start;
@@ -591,6 +659,23 @@ code {
   color: #24652a;
 }
 
+.run-badge--status-connected {
+  background: rgba(46, 125, 50, 0.14);
+  color: #24652a;
+}
+
+.run-badge--status-degraded,
+.run-badge--status-revoked,
+.run-badge--status-disconnected {
+  background: rgba(196, 85, 40, 0.12);
+  color: #9a461f;
+}
+
+.run-badge--status-pending {
+  background: rgba(31, 44, 55, 0.08);
+  color: var(--muted);
+}
+
 .run-badge--status-failed,
 .run-badge--status-cancelled {
   background: rgba(196, 85, 40, 0.12);
@@ -728,6 +813,10 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .integration-hero {
+    grid-template-columns: 1fr;
+  }
+
   .file-list {
     border-right: none;
     border-bottom: 1px solid var(--line);
@@ -739,6 +828,9 @@ code {
   .load-more-row,
   .run-card-header,
   .activity-header,
+  .integration-hero,
+  .integration-header,
+  .integration-actions,
   .settings-section-header,
   .settings-actions,
   .schedule-form-actions,
