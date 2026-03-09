@@ -12,18 +12,22 @@ alter table public.activity_events
       'claw_paused',
       'claw_recovered',
       'claw_restarted',
-      'claw_resumed',
       'integration_connected',
       'integration_degraded',
       'run_failed',
       'run_started',
       'run_succeeded',
       'schedule_created',
-      'schedule_deleted',
-      'schedule_disabled',
-      'schedule_enabled',
       'schedule_triggered',
       'schedule_updated',
       'secret_rotated'
     )
+  );
+
+alter table public.runs
+  drop constraint if exists runs_trigger_type_check;
+
+alter table public.runs
+  add constraint runs_trigger_type_check check (
+    trigger_type in ('manual','schedule','scheduled','integration_event','system')
   );

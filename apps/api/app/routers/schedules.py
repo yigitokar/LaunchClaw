@@ -1,13 +1,18 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.auth import get_current_user_id
+from app.scheduler import compute_next_run_at, create_scheduled_run
 from app.db import get_supabase
-from app.routers._helpers import record_activity_event, verify_claw_ownership
-from app.services.scheduler import compute_next_run_at
+from app.routers._helpers import (
+    build_next_cursor,
+    parse_offset_cursor,
+    record_activity_event,
+    verify_claw_ownership,
+)
 
 
 router = APIRouter(tags=["schedules"])
@@ -21,6 +26,13 @@ class SchedulePayload(BaseModel):
 
 class ToggleSchedulePayload(BaseModel):
     enabled: bool
+
+
+SCHEDULE_SELECT_FIELDS = "id, name, schedule_expr, enabled, last_run_at, next_run_at, created_at, updated_at"
+
+
+def _detail(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
 
 
 def _clean_schedule_name(name: str) -> str:
@@ -60,14 +72,14 @@ def _get_schedule_for_claw(claw_id: str, schedule_id: str) -> dict[str, Any]:
     result = (
         get_supabase()
         .table("schedules")
-        .select("*")
+        .select("id, claw_id, name, schedule_expr, enabled, last_run_at, next_run_at, created_at, updated_at")
         .eq("id", schedule_id)
         .eq("claw_id", claw_id)
         .maybe_single()
         .execute()
     )
     if not result.data:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Schedule not found"})
+        raise HTTPException(status_code=404, detail=_detail("not_found", "Schedule not found"))
     return result.data
 
 
@@ -83,18 +95,31 @@ def _schedule_event_metadata(schedule: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/api/claws/{claw_id}/schedules")
-async def list_schedules(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, Any]:
+async def list_schedules(
+    claw_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    user_id: str = Depends(get_current_user_id),
+) -> dict[str, Any]:
     verify_claw_ownership(claw_id, user_id)
+    offset = parse_offset_cursor(cursor)
 
     result = (
         get_supabase()
         .table("schedules")
-        .select("id, claw_id, name, schedule_expr, enabled, last_run_at, next_run_at, created_at, updated_at")
+        .select(SCHEDULE_SELECT_FIELDS)
         .eq("claw_id", claw_id)
         .order("created_at", desc=True)
+        .order("id", desc=True)
+        .range(offset, offset + limit)
         .execute()
     )
-    return {"items": result.data or []}
+
+    items = result.data or []
+    return {
+        "items": items[:limit],
+        "next_cursor": build_next_cursor(offset, limit, len(items)),
+    }
 
 
 @router.post("/api/claws/{claw_id}/schedules")
@@ -134,7 +159,7 @@ async def create_schedule(
         metadata=_schedule_event_metadata(schedule),
     )
 
-    return schedule
+    return {key: schedule.get(key) for key in SCHEDULE_SELECT_FIELDS.split(", ")}
 
 
 @router.put("/api/claws/{claw_id}/schedules/{schedule_id}")
@@ -182,7 +207,7 @@ async def update_schedule(
         },
     )
 
-    return schedule
+    return {key: schedule.get(key) for key in SCHEDULE_SELECT_FIELDS.split(", ")}
 
 
 @router.post("/api/claws/{claw_id}/schedules/{schedule_id}/toggle")
@@ -212,36 +237,27 @@ async def toggle_schedule(
         .execute()
     )
     schedule = result.data[0]
-    event_type = "schedule_enabled" if body.enabled else "schedule_disabled"
-    summary = f"Schedule {'enabled' if body.enabled else 'disabled'}: {schedule['name']}"
-
     record_activity_event(
         claw_id=claw_id,
-        event_type=event_type,
-        summary=summary,
-        metadata=_schedule_event_metadata(schedule),
+        event_type="schedule_updated",
+        summary=f"Schedule {'enabled' if body.enabled else 'disabled'}: {schedule['name']}",
+        metadata={
+            "previous_enabled": existing["enabled"],
+            **_schedule_event_metadata(schedule),
+        },
     )
 
-    return schedule
+    return {key: schedule.get(key) for key in SCHEDULE_SELECT_FIELDS.split(", ")}
 
 
-@router.delete("/api/claws/{claw_id}/schedules/{schedule_id}")
-async def delete_schedule(
+@router.post("/api/claws/{claw_id}/schedules/{schedule_id}/run-now")
+async def run_schedule_now(
     claw_id: str,
     schedule_id: str,
     user_id: str = Depends(get_current_user_id),
 ) -> dict[str, Any]:
     verify_claw_ownership(claw_id, user_id)
-    existing = _get_schedule_for_claw(claw_id, schedule_id)
+    schedule = _get_schedule_for_claw(claw_id, schedule_id)
+    run = create_scheduled_run(schedule=schedule, trigger_source="run_now")
 
-    get_supabase().table("schedules").delete().eq("id", schedule_id).eq("claw_id", claw_id).execute()
-
-    record_activity_event(
-        claw_id=claw_id,
-        event_type="schedule_deleted",
-        summary=f"Schedule deleted: {existing['name']}",
-        metadata=_schedule_event_metadata(existing),
-    )
-
-    return {"id": schedule_id, "deleted": True}
-
+    return {"run_id": run["id"], "status": run["status"]}

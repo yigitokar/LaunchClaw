@@ -1,18 +1,75 @@
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Final
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
 from app.db import get_supabase
 from app.routers._helpers import record_activity_event, verify_claw_ownership
-from app.services.lifecycle import validate_transition
 
 
 router = APIRouter(prefix="/api/claws", tags=["lifecycle"])
 
+VALID_TRANSITIONS: Final[dict[str, set[str]]] = {
+    "creating": {"provisioning"},
+    "provisioning": {"healthy", "failed"},
+    "healthy": {"paused", "restarting", "degraded"},
+    "paused": {"healthy"},
+    "restarting": {"healthy"},
+    "degraded": {"restarting"},
+    "failed": {"provisioning"},
+}
 
-def _update_claw_status(
+
+def _detail(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
+
+
+def _raise_invalid_transition(current_status: str, target_status: str) -> None:
+    allowed = sorted(VALID_TRANSITIONS.get(current_status, set()))
+    message = f"Cannot transition claw from {current_status} to {target_status}."
+    if allowed:
+        message = f"{message} Allowed transitions: {', '.join(allowed)}."
+    raise HTTPException(status_code=409, detail=_detail("conflict", message))
+
+
+def _ensure_transition(current_status: str, target_status: str) -> None:
+    if target_status not in VALID_TRANSITIONS.get(current_status, set()):
+        _raise_invalid_transition(current_status, target_status)
+
+
+def _persist_claw_status(
+    *,
+    claw_id: str,
+    user_id: str,
+    current_status: str,
+    target_status: str,
+) -> dict[str, Any]:
+    result = (
+        get_supabase()
+        .table("claws")
+        .update(
+            {
+                "status": target_status,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        .eq("id", claw_id)
+        .eq("user_id", user_id)
+        .eq("status", current_status)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(
+            status_code=409,
+            detail=_detail("conflict", "Claw status changed before this action completed. Refresh and try again."),
+        )
+
+    return result.data[0]
+
+
+def _transition_claw(
     *,
     claw_id: str,
     user_id: str,
@@ -21,54 +78,33 @@ def _update_claw_status(
     summary: str,
     action: str,
 ) -> dict[str, Any]:
-    current_claw = verify_claw_ownership(claw_id, user_id)
+    claw = verify_claw_ownership(claw_id, user_id)
+    _ensure_transition(claw["status"], target_status)
 
-    try:
-        persisted_target = validate_transition(current_claw["status"], target_status)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={"code": "invalid_transition", "message": str(exc)},
-        ) from exc
-
-    updated_at = datetime.now(timezone.utc).isoformat()
-    result = (
-        get_supabase()
-        .table("claws")
-        .update({"status": persisted_target, "updated_at": updated_at})
-        .eq("id", claw_id)
-        .eq("user_id", user_id)
-        .eq("status", current_claw["status"])
-        .execute()
+    updated = _persist_claw_status(
+        claw_id=claw_id,
+        user_id=user_id,
+        current_status=claw["status"],
+        target_status=target_status,
     )
 
-    if not result.data:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "invalid_transition",
-                "message": "Claw status changed before this action completed. Refresh and try again.",
-            },
-        )
-
-    updated_claw = result.data[0]
     record_activity_event(
         claw_id=claw_id,
         event_type=event_type,
         summary=summary,
         metadata={
             "action": action,
-            "previous_status": current_claw["status"],
-            "status": updated_claw["status"],
+            "previous_status": claw["status"],
+            "status": updated["status"],
         },
     )
 
-    return {"id": updated_claw["id"], "status": updated_claw["status"]}
+    return {"id": updated["id"], "status": updated["status"]}
 
 
 @router.post("/{claw_id}/pause")
 async def pause_claw(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, Any]:
-    return _update_claw_status(
+    return _transition_claw(
         claw_id=claw_id,
         user_id=user_id,
         target_status="paused",
@@ -80,11 +116,11 @@ async def pause_claw(claw_id: str, user_id: str = Depends(get_current_user_id)) 
 
 @router.post("/{claw_id}/resume")
 async def resume_claw(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, Any]:
-    return _update_claw_status(
+    return _transition_claw(
         claw_id=claw_id,
         user_id=user_id,
-        target_status="provisioning",
-        event_type="claw_resumed",
+        target_status="healthy",
+        event_type="claw_restarted",
         summary="Claw resumed",
         action="resume",
     )
@@ -92,19 +128,42 @@ async def resume_claw(claw_id: str, user_id: str = Depends(get_current_user_id))
 
 @router.post("/{claw_id}/restart")
 async def restart_claw(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, Any]:
-    return _update_claw_status(
+    claw = verify_claw_ownership(claw_id, user_id)
+    _ensure_transition(claw["status"], "restarting")
+
+    restarting = _persist_claw_status(
         claw_id=claw_id,
         user_id=user_id,
+        current_status=claw["status"],
         target_status="restarting",
-        event_type="claw_restarted",
-        summary="Claw restart requested",
-        action="restart",
     )
+    _ensure_transition(restarting["status"], "healthy")
+
+    updated = _persist_claw_status(
+        claw_id=claw_id,
+        user_id=user_id,
+        current_status=restarting["status"],
+        target_status="healthy",
+    )
+
+    record_activity_event(
+        claw_id=claw_id,
+        event_type="claw_restarted",
+        summary="Claw restarted",
+        metadata={
+            "action": "restart",
+            "previous_status": claw["status"],
+            "intermediate_status": restarting["status"],
+            "status": updated["status"],
+        },
+    )
+
+    return {"id": updated["id"], "status": updated["status"]}
 
 
 @router.post("/{claw_id}/recover")
 async def recover_claw(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, Any]:
-    return _update_claw_status(
+    return _transition_claw(
         claw_id=claw_id,
         user_id=user_id,
         target_status="provisioning",
@@ -112,4 +171,3 @@ async def recover_claw(claw_id: str, user_id: str = Depends(get_current_user_id)
         summary="Claw recovery started",
         action="recover",
     )
-

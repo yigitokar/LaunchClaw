@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -10,31 +9,67 @@ from app.routers._helpers import record_activity_event
 
 
 logger = logging.getLogger(__name__)
-SCHEDULER_POLL_INTERVAL_SECONDS = 60
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _to_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def compute_next_run_at(schedule_expr: str, *, base_time: datetime | None = None) -> datetime:
-    reference_time = base_time or utc_now()
-    if reference_time.tzinfo is None:
-        reference_time = reference_time.replace(tzinfo=timezone.utc)
+    reference_time = _to_utc(base_time or utc_now())
 
     try:
-        next_run = croniter(schedule_expr, reference_time).get_next(datetime)
+        next_run_at = croniter(schedule_expr, reference_time).get_next(datetime)
     except (CroniterBadCronError, CroniterBadDateError, ValueError) as exc:
         raise ValueError("Invalid cron expression") from exc
 
-    if next_run.tzinfo is None:
-        next_run = next_run.replace(tzinfo=timezone.utc)
-
-    return next_run.astimezone(timezone.utc)
+    return _to_utc(next_run_at)
 
 
-def scan_due_schedules(*, now: datetime | None = None) -> dict[str, Any]:
-    scan_time = now or utc_now()
+def create_scheduled_run(*, schedule: dict[str, Any], trigger_source: str) -> dict[str, Any]:
+    run_result = (
+        get_supabase()
+        .table("runs")
+        .insert(
+            {
+                "claw_id": schedule["claw_id"],
+                "trigger_type": "scheduled",
+                "status": "queued",
+                "input_summary": f"Scheduled run: {schedule['name']}",
+            }
+        )
+        .execute()
+    )
+    run = run_result.data[0]
+
+    record_activity_event(
+        claw_id=schedule["claw_id"],
+        run_id=run["id"],
+        event_type="schedule_triggered",
+        summary=f"Schedule triggered: {schedule['name']}",
+        metadata={
+            "schedule_id": schedule["id"],
+            "name": schedule["name"],
+            "schedule_expr": schedule["schedule_expr"],
+            "last_run_at": schedule.get("last_run_at"),
+            "next_run_at": schedule.get("next_run_at"),
+            "run_id": run["id"],
+            "status": run["status"],
+            "trigger_source": trigger_source,
+        },
+    )
+
+    return run
+
+
+def tick_scheduler(*, now: datetime | None = None) -> dict[str, Any]:
+    scan_time = _to_utc(now or utc_now())
     scan_time_iso = scan_time.isoformat()
     supabase = get_supabase()
 
@@ -48,8 +83,8 @@ def scan_due_schedules(*, now: datetime | None = None) -> dict[str, Any]:
     )
 
     schedules = result.data or []
-    triggered_count = 0
     triggered_schedule_ids: list[str] = []
+    triggered_count = 0
 
     for schedule in schedules:
         try:
@@ -68,41 +103,13 @@ def scan_due_schedules(*, now: datetime | None = None) -> dict[str, Any]:
                 .eq("next_run_at", schedule["next_run_at"])
                 .execute()
             )
-
             if not claimed.data:
                 continue
 
-            run_result = (
-                supabase.table("runs")
-                .insert(
-                    {
-                        "claw_id": schedule["claw_id"],
-                        "trigger_type": "schedule",
-                        "status": "queued",
-                        "input_summary": f"Scheduled run: {schedule['name']}",
-                    }
-                )
-                .execute()
-            )
-            run = run_result.data[0]
-
-            record_activity_event(
-                claw_id=schedule["claw_id"],
-                run_id=run["id"],
-                event_type="schedule_triggered",
-                summary=f"Schedule triggered: {schedule['name']}",
-                metadata={
-                    "schedule_id": schedule["id"],
-                    "schedule_name": schedule["name"],
-                    "schedule_expr": schedule["schedule_expr"],
-                    "run_id": run["id"],
-                    "status": run["status"],
-                    "next_run_at": next_run_at.isoformat(),
-                },
-            )
-
-            triggered_count += 1
+            claimed_schedule = claimed.data[0]
+            create_scheduled_run(schedule=claimed_schedule, trigger_source="scheduler")
             triggered_schedule_ids.append(schedule["id"])
+            triggered_count += 1
         except Exception:
             logger.exception("Failed to trigger schedule %s", schedule["id"])
 
@@ -112,13 +119,3 @@ def scan_due_schedules(*, now: datetime | None = None) -> dict[str, Any]:
         "triggered_count": triggered_count,
         "triggered_schedule_ids": triggered_schedule_ids,
     }
-
-
-async def run_scheduler_loop(*, poll_interval_seconds: int = SCHEDULER_POLL_INTERVAL_SECONDS) -> None:
-    while True:
-        try:
-            await asyncio.to_thread(scan_due_schedules)
-        except Exception:
-            logger.exception("Failed to scan due schedules")
-
-        await asyncio.sleep(poll_interval_seconds)

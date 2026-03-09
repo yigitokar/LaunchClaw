@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { ShellCard } from "@launchclaw/ui";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/time";
@@ -17,7 +17,6 @@ type ClawDetail = {
 
 type Schedule = {
   id: string;
-  claw_id: string;
   name: string;
   schedule_expr: string;
   enabled: boolean;
@@ -29,12 +28,23 @@ type Schedule = {
 
 type ScheduleResponse = {
   items: Schedule[];
+  next_cursor: string | null;
+};
+
+type ScheduleRunNowResponse = {
+  run_id: string;
+  status: string;
 };
 
 type ScheduleFormState = {
   name: string;
   schedule_expr: string;
   enabled: boolean;
+};
+
+type ScheduleActionState = {
+  id: string | null;
+  type: "toggle" | "run-now" | null;
 };
 
 const EMPTY_SCHEDULE_FORM: ScheduleFormState = {
@@ -93,10 +103,16 @@ export default function WorkspaceSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [creatingSchedule, setCreatingSchedule] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
-  const [scheduleActionId, setScheduleActionId] = useState<string | null>(null);
-  const [lifecycleAction, setLifecycleAction] = useState<string | null>(null);
+  const [scheduleAction, setScheduleAction] = useState<ScheduleActionState>({ id: null, type: null });
+  const [lifecycleAction, setLifecycleAction] = useState<"pause" | "resume" | "restart" | "recover" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
+
+  const flashScheduleMessage = useCallback((message: string) => {
+    setScheduleMessage(message);
+    setTimeout(() => setScheduleMessage(null), 2000);
+  }, []);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -104,7 +120,7 @@ export default function WorkspaceSettingsPage() {
       setError(null);
       const [clawData, scheduleData] = await Promise.all([
         apiFetch<ClawDetail>(`/api/claws/${clawId}`),
-        apiFetch<ScheduleResponse>(`/api/claws/${clawId}/schedules`),
+        apiFetch<ScheduleResponse>(`/api/claws/${clawId}/schedules?limit=100`),
       ]);
       setClaw(clawData);
       setNameValue(clawData.name);
@@ -121,7 +137,10 @@ export default function WorkspaceSettingsPage() {
   }, [loadSettings]);
 
   const handleSaveName = async () => {
-    if (!nameValue.trim()) return;
+    if (!nameValue.trim()) {
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -163,16 +182,13 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
-  const upsertSchedule = (updatedSchedule: Schedule) => {
+  const upsertSchedule = useCallback((updatedSchedule: Schedule) => {
     setSchedules((current) =>
-      sortSchedules([
-        updatedSchedule,
-        ...current.filter((schedule) => schedule.id !== updatedSchedule.id),
-      ]),
+      sortSchedules([updatedSchedule, ...current.filter((schedule) => schedule.id !== updatedSchedule.id)]),
     );
-  };
+  }, []);
 
-  const handleCreateSchedule = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateSchedule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!newSchedule.name.trim() || !newSchedule.schedule_expr.trim()) {
       return;
@@ -191,6 +207,7 @@ export default function WorkspaceSettingsPage() {
       });
       upsertSchedule(created);
       setNewSchedule(EMPTY_SCHEDULE_FORM);
+      flashScheduleMessage("Schedule added");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create schedule");
     } finally {
@@ -207,7 +224,12 @@ export default function WorkspaceSettingsPage() {
     });
   };
 
-  const handleSaveSchedule = async (event: React.FormEvent<HTMLFormElement>) => {
+  const stopEditingSchedule = () => {
+    setEditScheduleId(null);
+    setEditSchedule(EMPTY_SCHEDULE_FORM);
+  };
+
+  const handleSaveSchedule = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editScheduleId || !editSchedule.name.trim() || !editSchedule.schedule_expr.trim()) {
       return;
@@ -225,8 +247,8 @@ export default function WorkspaceSettingsPage() {
         }),
       });
       upsertSchedule(updated);
-      setEditScheduleId(null);
-      setEditSchedule(EMPTY_SCHEDULE_FORM);
+      stopEditingSchedule();
+      flashScheduleMessage("Schedule updated");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update schedule");
     } finally {
@@ -236,41 +258,33 @@ export default function WorkspaceSettingsPage() {
 
   const handleToggleSchedule = async (schedule: Schedule) => {
     try {
-      setScheduleActionId(schedule.id);
+      setScheduleAction({ id: schedule.id, type: "toggle" });
       setError(null);
       const updated = await apiFetch<Schedule>(`/api/claws/${clawId}/schedules/${schedule.id}/toggle`, {
         method: "POST",
         body: JSON.stringify({ enabled: !schedule.enabled }),
       });
       upsertSchedule(updated);
+      flashScheduleMessage(updated.enabled ? "Schedule enabled" : "Schedule disabled");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to toggle schedule");
     } finally {
-      setScheduleActionId(null);
+      setScheduleAction({ id: null, type: null });
     }
   };
 
-  const handleDeleteSchedule = async (schedule: Schedule) => {
-    const confirmed = window.confirm(`Delete the schedule "${schedule.name}"?`);
-    if (!confirmed) {
-      return;
-    }
-
+  const handleRunNow = async (schedule: Schedule) => {
     try {
-      setScheduleActionId(schedule.id);
+      setScheduleAction({ id: schedule.id, type: "run-now" });
       setError(null);
-      await apiFetch<{ id: string; deleted: boolean }>(`/api/claws/${clawId}/schedules/${schedule.id}`, {
-        method: "DELETE",
+      const queued = await apiFetch<ScheduleRunNowResponse>(`/api/claws/${clawId}/schedules/${schedule.id}/run-now`, {
+        method: "POST",
       });
-      setSchedules((current) => current.filter((item) => item.id !== schedule.id));
-      if (editScheduleId === schedule.id) {
-        setEditScheduleId(null);
-        setEditSchedule(EMPTY_SCHEDULE_FORM);
-      }
+      flashScheduleMessage(`Run queued (${queued.status})`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete schedule");
+      setError(e instanceof Error ? e.message : "Failed to queue schedule run");
     } finally {
-      setScheduleActionId(null);
+      setScheduleAction({ id: null, type: null });
     }
   };
 
@@ -285,17 +299,17 @@ export default function WorkspaceSettingsPage() {
   if (!claw) {
     return (
       <ShellCard title="Settings" description="Could not load Claw settings.">
-        {error && <p className="status">{error}</p>}
+        {error ? <p className="status">{error}</p> : null}
       </ShellCard>
     );
   }
 
   const isDirty = nameValue.trim() !== claw.name;
   const normalizedStatus = normalizeClawStatus(claw.status);
-  const canPause = normalizedStatus === "running";
-  const canResume = normalizedStatus === "paused";
-  const canRestart = normalizedStatus === "running" || normalizedStatus === "error";
-  const canRecover = normalizedStatus === "error";
+  const canPause = claw.status === "healthy";
+  const canResume = claw.status === "paused";
+  const canRestart = claw.status === "healthy" || claw.status === "degraded";
+  const canRecover = claw.status === "failed";
 
   return (
     <ShellCard title="Settings" description="Manage your Claw's configuration.">
@@ -307,13 +321,13 @@ export default function WorkspaceSettingsPage() {
               className="settings-input"
               type="text"
               value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
+              onChange={(event) => setNameValue(event.target.value)}
               maxLength={80}
             />
             <button className="editor-save" onClick={handleSaveName} disabled={saving || !isDirty}>
               {saving ? "Saving..." : "Save"}
             </button>
-            {saveMessage && <span className="file-badge">{saveMessage}</span>}
+            {saveMessage ? <span className="file-badge">{saveMessage}</span> : null}
           </div>
         </div>
         <div className="table-row">
@@ -361,7 +375,7 @@ export default function WorkspaceSettingsPage() {
             {lifecycleAction === "resume" ? "Resuming..." : "Resume"}
           </button>
           <button
-            className="secondary-button secondary-button--danger"
+            className="secondary-button"
             type="button"
             onClick={() => void handleLifecycleAction("restart")}
             disabled={lifecycleAction !== null || !canRestart}
@@ -384,7 +398,7 @@ export default function WorkspaceSettingsPage() {
       <section className="settings-section">
         <div className="settings-section-copy">
           <h2 className="settings-section-title">Schedules</h2>
-          <p className="muted">Manage recurring runs with UTC cron expressions.</p>
+          <p className="muted">List, add, update, toggle, and test recurring runs with UTC cron expressions.</p>
         </div>
 
         <form className="schedule-form" onSubmit={handleCreateSchedule}>
@@ -434,10 +448,12 @@ export default function WorkspaceSettingsPage() {
               type="submit"
               disabled={creatingSchedule || !newSchedule.name.trim() || !newSchedule.schedule_expr.trim()}
             >
-              {creatingSchedule ? "Creating..." : "Create schedule"}
+              {creatingSchedule ? "Adding..." : "Add Schedule"}
             </button>
           </div>
         </form>
+
+        {scheduleMessage ? <span className="file-badge">{scheduleMessage}</span> : null}
 
         {schedules.length === 0 ? (
           <p className="muted">No schedules yet. Add one above to start recurring runs.</p>
@@ -445,7 +461,9 @@ export default function WorkspaceSettingsPage() {
           <div className="schedule-list">
             {schedules.map((schedule) => {
               const isEditing = editScheduleId === schedule.id;
-              const isBusy = scheduleActionId === schedule.id || (savingSchedule && isEditing);
+              const isToggling = scheduleAction.id === schedule.id && scheduleAction.type === "toggle";
+              const isRunningNow = scheduleAction.id === schedule.id && scheduleAction.type === "run-now";
+              const isBusy = scheduleAction.id === schedule.id || (savingSchedule && isEditing);
 
               return (
                 <article className="schedule-card" key={schedule.id}>
@@ -503,7 +521,7 @@ export default function WorkspaceSettingsPage() {
                           <button
                             className="secondary-button"
                             type="button"
-                            onClick={() => setEditScheduleId(null)}
+                            onClick={stopEditingSchedule}
                             disabled={savingSchedule}
                           >
                             Cancel
@@ -531,7 +549,7 @@ export default function WorkspaceSettingsPage() {
                             onChange={() => void handleToggleSchedule(schedule)}
                             disabled={isBusy}
                           />
-                          <span>{schedule.enabled ? "On" : "Off"}</span>
+                          <span>{isToggling ? "Saving..." : schedule.enabled ? "On" : "Off"}</span>
                         </label>
                       </div>
 
@@ -560,12 +578,12 @@ export default function WorkspaceSettingsPage() {
                           Edit
                         </button>
                         <button
-                          className="secondary-button secondary-button--danger"
+                          className="secondary-button"
                           type="button"
-                          onClick={() => void handleDeleteSchedule(schedule)}
+                          onClick={() => void handleRunNow(schedule)}
                           disabled={isBusy}
                         >
-                          {scheduleActionId === schedule.id ? "Working..." : "Delete"}
+                          {isRunningNow ? "Queueing..." : "Run Now"}
                         </button>
                       </div>
                     </>
@@ -577,7 +595,7 @@ export default function WorkspaceSettingsPage() {
         )}
       </section>
 
-      {error && <p className="status">{error}</p>}
+      {error ? <p className="status">{error}</p> : null}
     </ShellCard>
   );
 }
