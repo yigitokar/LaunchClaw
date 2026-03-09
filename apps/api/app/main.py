@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import suppress
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,8 +9,11 @@ from app.config import settings
 from app.db import get_supabase
 from app.routers.activity import router as activity_router
 from app.routers.claws import router as claws_router
+from app.routers.lifecycle import router as lifecycle_router
 from app.routers.runs import router as runs_router
+from app.routers.schedules import router as schedules_router
 from app.routers.workspace_files import router as workspace_files_router
+from app.services.scheduler import run_scheduler_loop
 
 
 app = FastAPI(
@@ -25,9 +31,27 @@ app.add_middleware(
 )
 
 app.include_router(claws_router)
+app.include_router(lifecycle_router)
 app.include_router(runs_router)
+app.include_router(schedules_router)
 app.include_router(activity_router)
 app.include_router(workspace_files_router)
+
+
+@app.on_event("startup")
+async def start_scheduler() -> None:
+    app.state.scheduler_task = asyncio.create_task(run_scheduler_loop())
+
+
+@app.on_event("shutdown")
+async def stop_scheduler() -> None:
+    scheduler_task = getattr(app.state, "scheduler_task", None)
+    if scheduler_task is None:
+        return
+
+    scheduler_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await scheduler_task
 
 
 @app.get("/healthz")

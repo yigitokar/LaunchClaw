@@ -389,6 +389,151 @@ code {
   border-color: var(--accent);
 }
 
+.settings-input--mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.settings-section {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-section-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-section-title,
+.schedule-card-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settings-section-header,
+.schedule-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-status-badge,
+.settings-inline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.settings-status-badge--running,
+.settings-inline-badge--on {
+  background: rgba(46, 125, 50, 0.14);
+  color: #24652a;
+}
+
+.settings-status-badge--paused {
+  background: rgba(31, 44, 55, 0.08);
+  color: var(--muted);
+}
+
+.settings-status-badge--provisioning,
+.settings-status-badge--restarting {
+  background: rgba(14, 124, 134, 0.14);
+  color: var(--accent-strong);
+}
+
+.settings-status-badge--error {
+  background: rgba(196, 85, 40, 0.12);
+  color: #9a461f;
+}
+
+.settings-status-badge--creating,
+.settings-inline-badge {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.settings-actions,
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.schedule-form,
+.schedule-form-field,
+.schedule-card-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.schedule-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+}
+
+.schedule-form-field span {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.schedule-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-list {
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.schedule-form--inline {
+  gap: 14px;
+}
+
+.schedule-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.schedule-toggle input {
+  accent-color: var(--accent);
+}
+
+.schedule-toggle--field {
+  align-self: end;
+  padding-bottom: 8px;
+}
+
 /* Work and activity */
 .section-divider {
   margin: 24px 0;
@@ -603,6 +748,11 @@ code {
   cursor: pointer;
 }
 
+.secondary-button--danger {
+  border-color: rgba(196, 85, 40, 0.24);
+  color: #9a461f;
+}
+
 .secondary-button:hover:not(:disabled) {
   border-color: rgba(14, 124, 134, 0.28);
   color: var(--accent-strong);
@@ -666,5 +816,20 @@ code {
 
   .activity-card {
     grid-template-columns: 1fr;
+  }
+
+  .settings-section-header,
+  .schedule-card-header,
+  .schedule-form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .schedule-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-toggle--field {
+    padding-bottom: 0;
   }
 }
