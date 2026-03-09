@@ -36,7 +36,7 @@ Phase 6 — GitHub Integration
 - [x] Build Activity tab UI (event feed)
 - [x] GET /api/claws/:id/activity — activity feed endpoint
 
-### Phase 5: Lifecycle & Scheduling ✅ (PR #5, open 2026-03-09)
+### Phase 5: Lifecycle & Scheduling ✅ (PR #5, closed/squashed to main 2026-03-09)
 - [x] POST pause/resume/restart/recover endpoints
 - [x] Lifecycle state machine enforcement
 - [x] CRUD for schedules
@@ -71,7 +71,7 @@ Phase 6 — GitHub Integration
 - Phase 1: Data Model & Auth Foundation — PR #1, merged 2026-03-09
 - Phase 2: Claw CRUD & Create Flow — PR #2, merged 2026-03-09
 - Phase 3: Workspace Shell & Files — PR #3, merged 2026-03-09
-- Phase 5: Lifecycle & Scheduling — PR #5, open 2026-03-09
+- Phase 5: Lifecycle & Scheduling — PR #5, closed/on main 2026-03-09
 
 ## Notes
 - FastAPI backend (apps/api) — Python
