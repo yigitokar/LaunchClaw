@@ -4,8 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
+from app.middleware.error_handler import ErrorHandlerMiddleware, register_error_handlers
 from app.routers.activity import router as activity_router
 from app.routers.approvals import router as approvals_router
+from app.routers.billing import router as billing_router
 from app.routers.claws import router as claws_router
 from app.routers.integrations import router as integrations_router
 from app.routers.internal import router as internal_router
@@ -22,6 +24,8 @@ app = FastAPI(
     description="Control-plane API scaffold derived from the LaunchClaw v1 docs.",
 )
 
+register_error_handlers(app)
+app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.cors_origin],
@@ -40,6 +44,7 @@ app.include_router(integrations_router)
 app.include_router(approvals_router)
 app.include_router(secrets_router)
 app.include_router(internal_router)
+app.include_router(billing_router)
 
 
 @app.get("/healthz")

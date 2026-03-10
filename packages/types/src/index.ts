@@ -53,3 +53,40 @@ export type Secret = {
   restart_required: boolean;
   created_at: string;
 };
+
+export interface BillingAccount {
+  id: string;
+  user_id: string;
+  provider: string;
+  plan: string;
+  status: string;
+  stripe_customer_id: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingSummary {
+  provider: string;
+  plan: string;
+  status: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+}
+
+export interface UsageSummary {
+  current_period: {
+    runs: number;
+    tokens: number;
+    estimated_cost: number;
+  };
+}
+
+export interface CheckoutRequest {
+  plan: "starter";
+}
+
+export interface CheckoutResponse {
+  checkout_url: string;
+}
