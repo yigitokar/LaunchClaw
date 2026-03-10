@@ -33,6 +33,14 @@ export default function ConsolePage() {
         <span className="eyebrow">Launch Console</span>
         <h1>{appConfig.name}</h1>
         <p>{appConfig.tagline}</p>
+        <nav className="nav-row">
+          <Link className="nav-link" href="/app/create">
+            Create a Claw
+          </Link>
+          <Link className="nav-link" href="/billing">
+            Billing
+          </Link>
+        </nav>
       </section>
 
       <section className="grid">

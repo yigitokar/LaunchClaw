@@ -668,19 +668,22 @@ code {
 
 .run-badge--status-denied,
 .run-badge--status-degraded,
+.run-badge--status-past-due,
 .run-badge--status-revoked,
 .run-badge--status-disconnected {
   background: rgba(196, 85, 40, 0.12);
   color: #9a461f;
 }
 
-.run-badge--status-pending {
+.run-badge--status-pending,
+.run-badge--status-trialing {
   background: rgba(31, 44, 55, 0.08);
   color: var(--muted);
 }
 
 .run-badge--status-failed,
-.run-badge--status-cancelled {
+.run-badge--status-cancelled,
+.run-badge--status-inactive {
   background: rgba(196, 85, 40, 0.12);
   color: #9a461f;
 }

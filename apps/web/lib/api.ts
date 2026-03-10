@@ -1,4 +1,11 @@
-import type { Approval, ApprovalStatus, Secret } from "@launchclaw/types";
+import type {
+  Approval,
+  ApprovalStatus,
+  BillingSummary,
+  CheckoutResponse,
+  Secret,
+  UsageSummary,
+} from "@launchclaw/types";
 import { createClient } from "@/lib/supabase/client";
 
 const API_BASE =
@@ -26,6 +33,18 @@ export type UpsertSecretPayload = {
   label: string;
   value: string;
 };
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 function buildQueryString(params: Record<string, string | number | null | undefined>): string {
   const searchParams = new URLSearchParams();
@@ -71,7 +90,8 @@ export async function apiFetch<T = unknown>(
       body?.detail?.message ||
       body?.detail ||
       res.statusText;
-    throw new Error(message);
+    const code = body?.error?.code || body?.detail?.code;
+    throw new ApiError(message, res.status, code);
   }
 
   return res.json();
@@ -112,4 +132,19 @@ export function upsertSecret(clawId: string, payload: UpsertSecretPayload): Prom
 
 export function revokeSecret(clawId: string, secretId: string): Promise<Secret> {
   return apiFetch<Secret>(`/api/claws/${clawId}/secrets/${secretId}`, { method: "DELETE" });
+}
+
+export function getBillingSummary(): Promise<BillingSummary> {
+  return apiFetch<BillingSummary>("/api/billing/me");
+}
+
+export function createCheckoutSession(plan: "starter"): Promise<CheckoutResponse> {
+  return apiFetch<CheckoutResponse>("/api/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export function getUsageSummary(): Promise<UsageSummary> {
+  return apiFetch<UsageSummary>("/api/usage/me");
 }
