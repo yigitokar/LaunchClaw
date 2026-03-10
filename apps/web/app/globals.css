@@ -659,11 +659,14 @@ code {
   color: #24652a;
 }
 
+.run-badge--status-approved,
+.run-badge--status-active,
 .run-badge--status-connected {
   background: rgba(46, 125, 50, 0.14);
   color: #24652a;
 }
 
+.run-badge--status-denied,
 .run-badge--status-degraded,
 .run-badge--status-revoked,
 .run-badge--status-disconnected {
