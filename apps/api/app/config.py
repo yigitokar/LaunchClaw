@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     internal_service_token: str = ""
     github_app_slug: str = "launchclaw"
+    github_app_state_secret: str = ""
     github_app_id: str = ""
     github_app_private_key: str = ""
     github_client_id: str = ""

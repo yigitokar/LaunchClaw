@@ -6,5 +6,5 @@ export default async function WorkspaceIndexPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/workspace/${id}/integrations`);
+  redirect(`/workspace/${id}/work`);
 }

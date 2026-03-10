@@ -2,7 +2,8 @@ import base64
 import hashlib
 import hmac
 import json
-import time
+import secrets
+from datetime import timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,118 +13,159 @@ from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.routers._helpers import record_activity_event, verify_claw_ownership
+from app.services.scheduler import utc_now
 
 router = APIRouter(tags=["integrations"])
 
-INTEGRATION_RESPONSE_FIELDS = "id, claw_id, provider, status, scope_summary, metadata, created_at, updated_at"
+GITHUB_PROVIDER = "github"
 GITHUB_SCOPE_SUMMARY = "repo metadata, pull requests, contents"
-STATE_TTL_SECONDS = 600
+STATE_TTL_MINUTES = 15
+LIST_FIELDS = "id, claw_id, provider, status, external_account_ref, scope_summary, created_at, updated_at"
+DETAIL_FIELDS = f"{LIST_FIELDS}, config_json"
+PENDING_STATE_TOKEN_KEY = "pending_state_token"
+PENDING_STATE_EXPIRES_AT_KEY = "pending_state_expires_at"
 
 
-def _encode_token_bytes(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
-
-
-def _decode_token_bytes(value: str) -> bytes:
-    padding = "=" * (-len(value) % 4)
-    return base64.urlsafe_b64decode(f"{value}{padding}")
+def _detail(code: str, message: str) -> dict[str, str]:
+    return {"code": code, "message": message}
 
 
 def _state_secret() -> bytes:
-    secret_source = (
-        settings.supabase_service_key
-        or settings.internal_service_token
-        or f"{settings.app_name}:{settings.cors_origin}:{settings.github_app_slug}"
-    )
-    return secret_source.encode("utf-8")
+    secret = settings.github_app_state_secret.strip()
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail=_detail("integration_error", "GitHub state signing is not configured"),
+        )
+    return secret.encode("utf-8")
 
 
-def generate_github_state(claw_id: str) -> str:
-    payload = {
-        "claw_id": claw_id,
-        "exp": int(time.time()) + STATE_TTL_SECONDS,
-    }
-    encoded_payload = _encode_token_bytes(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    signature = hmac.new(_state_secret(), encoded_payload.encode("ascii"), hashlib.sha256).digest()
-    return f"{encoded_payload}.{_encode_token_bytes(signature)}"
+def _github_install_url(state_token: str) -> str:
+    slug = settings.github_app_slug.strip()
+    if not slug:
+        raise HTTPException(
+            status_code=503,
+            detail=_detail("integration_error", "GitHub App slug is not configured"),
+        )
+    return f"https://github.com/apps/{slug}/installations/new?state={state_token}"
 
 
-def validate_github_state(state: str) -> dict[str, Any]:
+def _workspace_redirect_url(claw_id: str) -> str:
+    return f"{settings.cors_origin.rstrip('/')}/workspace/{claw_id}/integrations?github=connected"
+
+
+def _encode_state_bytes(raw_value: bytes) -> str:
+    return base64.urlsafe_b64encode(raw_value).rstrip(b"=").decode("ascii")
+
+
+def _decode_state_bytes(encoded_value: str) -> bytes:
+    padding = "=" * (-len(encoded_value) % 4)
     try:
-        encoded_payload, encoded_signature = state.split(".", 1)
+        return base64.urlsafe_b64decode(f"{encoded_value}{padding}".encode("ascii"))
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_state", "message": "Invalid GitHub state token"},
+            detail=_detail("validation_error", "Invalid GitHub state token"),
         ) from exc
 
-    expected_signature = _encode_token_bytes(
-        hmac.new(_state_secret(), encoded_payload.encode("ascii"), hashlib.sha256).digest()
-    )
-    if not hmac.compare_digest(encoded_signature, expected_signature):
+
+def _sign_state(encoded_payload: str) -> str:
+    signature = hmac.new(_state_secret(), encoded_payload.encode("ascii"), hashlib.sha256).digest()
+    return _encode_state_bytes(signature)
+
+
+def _generate_state_token(claw_id: str, integration_id: str) -> tuple[str, str]:
+    expires_at = utc_now() + timedelta(minutes=STATE_TTL_MINUTES)
+    payload = {
+        "claw_id": claw_id,
+        "integration_id": integration_id,
+        "nonce": secrets.token_urlsafe(16),
+        "exp": int(expires_at.timestamp()),
+    }
+    encoded_payload = _encode_state_bytes(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    return f"{encoded_payload}.{_sign_state(encoded_payload)}", expires_at.isoformat()
+
+
+def _validate_state_token(state_token: str) -> dict[str, Any]:
+    try:
+        encoded_payload, signature = state_token.split(".", 1)
+    except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_state", "message": "Invalid GitHub state token"},
+            detail=_detail("validation_error", "Invalid GitHub state token"),
+        ) from exc
+
+    if not hmac.compare_digest(signature, _sign_state(encoded_payload)):
+        raise HTTPException(
+            status_code=400,
+            detail=_detail("validation_error", "Invalid GitHub state token"),
         )
 
     try:
-        payload = json.loads(_decode_token_bytes(encoded_payload))
-    except (ValueError, json.JSONDecodeError) as exc:
+        payload = json.loads(_decode_state_bytes(encoded_payload))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_state", "message": "Invalid GitHub state token"},
+            detail=_detail("validation_error", "Invalid GitHub state token"),
         ) from exc
 
-    if not isinstance(payload, dict) or not payload.get("claw_id"):
+    if not isinstance(payload, dict):
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_state", "message": "Invalid GitHub state token"},
+            detail=_detail("validation_error", "Invalid GitHub state token"),
         )
 
     expires_at = payload.get("exp")
-    if not isinstance(expires_at, int) or expires_at < int(time.time()):
+    if not isinstance(expires_at, int) or expires_at < int(utc_now().timestamp()):
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_state", "message": "Expired GitHub state token"},
+            detail=_detail("validation_error", "GitHub state token has expired"),
         )
 
     return payload
 
 
-def get_integration_for_claw(claw_id: str, integration_id: str) -> dict[str, Any]:
+def _serialize_integration(integration: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": integration["id"],
+        "claw_id": integration["claw_id"],
+        "provider": integration["provider"],
+        "status": integration["status"],
+        "external_account_ref": integration.get("external_account_ref"),
+        "scope_summary": integration.get("scope_summary"),
+        "created_at": integration["created_at"],
+        "updated_at": integration["updated_at"],
+    }
+
+
+def _get_integration_for_claw(claw_id: str, integration_id: str) -> dict[str, Any]:
     result = (
         get_supabase()
         .table("integrations")
-        .select(INTEGRATION_RESPONSE_FIELDS)
+        .select(DETAIL_FIELDS)
         .eq("id", integration_id)
         .eq("claw_id", claw_id)
         .maybe_single()
         .execute()
     )
     if not result.data:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Integration not found"})
+        raise HTTPException(status_code=404, detail=_detail("not_found", "Integration not found"))
     return result.data
 
 
-def get_github_integration_for_claw(claw_id: str) -> dict[str, Any] | None:
+def _get_latest_github_integration_for_claw(claw_id: str) -> dict[str, Any] | None:
     result = (
         get_supabase()
         .table("integrations")
-        .select(INTEGRATION_RESPONSE_FIELDS)
+        .select(DETAIL_FIELDS)
         .eq("claw_id", claw_id)
-        .eq("provider", "github")
+        .eq("provider", GITHUB_PROVIDER)
         .order("created_at", desc=True)
         .limit(1)
         .execute()
     )
     items = result.data or []
     return items[0] if items else None
-
-
-def ensure_claw_exists(claw_id: str) -> None:
-    result = get_supabase().table("claws").select("id").eq("id", claw_id).maybe_single().execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Claw not found"})
 
 
 @router.get("/api/claws/{claw_id}/integrations")
@@ -136,7 +178,7 @@ async def list_integrations(
     result = (
         get_supabase()
         .table("integrations")
-        .select(INTEGRATION_RESPONSE_FIELDS)
+        .select(LIST_FIELDS)
         .eq("claw_id", claw_id)
         .order("created_at", desc=True)
         .execute()
@@ -150,68 +192,127 @@ async def connect_github_integration(
     user_id: str = Depends(get_current_user_id),
 ) -> dict[str, str]:
     verify_claw_ownership(claw_id, user_id)
-    state = generate_github_state(claw_id)
-    redirect_url = f"https://github.com/apps/{settings.github_app_slug}/installations/new?state={state}"
-    return {"redirect_url": redirect_url}
+    _state_secret()
+
+    integration = _get_latest_github_integration_for_claw(claw_id)
+    if integration is None:
+        result = (
+            get_supabase()
+            .table("integrations")
+            .insert(
+                {
+                    "claw_id": claw_id,
+                    "provider": GITHUB_PROVIDER,
+                    "status": "pending",
+                    "scope_summary": GITHUB_SCOPE_SUMMARY,
+                    "config_json": {},
+                }
+            )
+            .execute()
+        )
+        integration = result.data[0]
+
+    state_token, expires_at = _generate_state_token(claw_id, integration["id"])
+    config_json = dict(integration.get("config_json") or {})
+    config_json[PENDING_STATE_TOKEN_KEY] = state_token
+    config_json[PENDING_STATE_EXPIRES_AT_KEY] = expires_at
+
+    (
+        get_supabase()
+        .table("integrations")
+        .update(
+            {
+                "status": "pending",
+                "scope_summary": GITHUB_SCOPE_SUMMARY,
+                "config_json": config_json,
+            }
+        )
+        .eq("id", integration["id"])
+        .eq("claw_id", claw_id)
+        .execute()
+    )
+
+    record_activity_event(
+        claw_id=claw_id,
+        event_type="integration_connect_started",
+        summary="GitHub connection started",
+        metadata={
+            "integration_id": integration["id"],
+            "provider": GITHUB_PROVIDER,
+        },
+    )
+
+    return {"redirect_url": _github_install_url(state_token)}
 
 
 @router.get("/api/integrations/github/callback")
 async def github_callback(
-    state: str = Query(..., min_length=1),
-    installation_id: int | None = Query(None, ge=1),
+    state: str | None = Query(None),
+    installation_id: str | None = Query(None),
+    setup_action: str | None = Query(None),
 ) -> RedirectResponse:
-    if installation_id is None:
+    _state_secret()
+
+    if not state or not installation_id:
         raise HTTPException(
             status_code=400,
-            detail={"code": "validation_error", "message": "installation_id is required"},
+            detail=_detail("validation_error", "Missing required GitHub callback parameters"),
         )
 
-    payload = validate_github_state(state)
-    claw_id = str(payload["claw_id"])
-    ensure_claw_exists(claw_id)
-
-    update_payload = {
-        "provider": "github",
-        "status": "connected",
-        "scope_summary": GITHUB_SCOPE_SUMMARY,
-        "external_account_ref": str(installation_id),
-        "metadata": {"installation_id": installation_id},
-    }
-    existing = get_github_integration_for_claw(claw_id)
-
-    if existing:
-        result = (
-            get_supabase()
-            .table("integrations")
-            .update(update_payload)
-            .eq("id", existing["id"])
-            .eq("claw_id", claw_id)
-            .execute()
+    payload = _validate_state_token(state)
+    claw_id = payload.get("claw_id")
+    integration_id = payload.get("integration_id")
+    if not isinstance(claw_id, str) or not claw_id or not isinstance(integration_id, str) or not integration_id:
+        raise HTTPException(
+            status_code=400,
+            detail=_detail("validation_error", "Invalid GitHub state token"),
         )
-        integration = result.data[0]
-    else:
-        result = (
-            get_supabase()
-            .table("integrations")
-            .insert({"claw_id": claw_id, **update_payload})
-            .execute()
+
+    integration = _get_integration_for_claw(claw_id, integration_id)
+    config_json = dict(integration.get("config_json") or {})
+    if config_json.get(PENDING_STATE_TOKEN_KEY) != state:
+        raise HTTPException(
+            status_code=400,
+            detail=_detail("validation_error", "GitHub state token does not match the active install flow"),
         )
-        integration = result.data[0]
+
+    config_json.pop(PENDING_STATE_TOKEN_KEY, None)
+    config_json.pop(PENDING_STATE_EXPIRES_AT_KEY, None)
+    config_json["installation_id"] = installation_id
+    config_json["last_connected_at"] = utc_now().isoformat()
+    if setup_action:
+        config_json["setup_action"] = setup_action
+
+    result = (
+        get_supabase()
+        .table("integrations")
+        .update(
+            {
+                "status": "connected",
+                "external_account_ref": installation_id,
+                "scope_summary": GITHUB_SCOPE_SUMMARY,
+                "config_json": config_json,
+            }
+        )
+        .eq("id", integration_id)
+        .eq("claw_id", claw_id)
+        .execute()
+    )
+    updated = result.data[0]
 
     record_activity_event(
         claw_id=claw_id,
         event_type="integration_connected",
-        summary="GitHub integration connected",
+        summary="GitHub connected",
         metadata={
-            "integration_id": integration["id"],
-            "provider": "github",
+            "integration_id": integration_id,
+            "provider": GITHUB_PROVIDER,
             "installation_id": installation_id,
-            "status": integration["status"],
+            "status": updated["status"],
         },
     )
 
-    workspace_url = f"{settings.cors_origin.rstrip('/')}/workspace/{claw_id}"
-    return RedirectResponse(url=workspace_url, status_code=303)
+    return RedirectResponse(url=_workspace_redirect_url(claw_id), status_code=303)
 
 
 @router.post("/api/claws/{claw_id}/integrations/{integration_id}/disconnect")
@@ -221,17 +322,36 @@ async def disconnect_integration(
     user_id: str = Depends(get_current_user_id),
 ) -> dict[str, Any]:
     verify_claw_ownership(claw_id, user_id)
-    get_integration_for_claw(claw_id, integration_id)
+    integration = _get_integration_for_claw(claw_id, integration_id)
+
+    config_json = dict(integration.get("config_json") or {})
+    config_json.pop(PENDING_STATE_TOKEN_KEY, None)
+    config_json.pop(PENDING_STATE_EXPIRES_AT_KEY, None)
+    config_json["last_disconnected_at"] = utc_now().isoformat()
 
     result = (
         get_supabase()
         .table("integrations")
-        .update({"status": "disconnected"})
+        .update({"status": "disconnected", "config_json": config_json})
         .eq("id", integration_id)
         .eq("claw_id", claw_id)
         .execute()
     )
-    return result.data[0]
+    updated = result.data[0]
+
+    record_activity_event(
+        claw_id=claw_id,
+        event_type="integration_disconnected",
+        summary="GitHub disconnected",
+        metadata={
+            "integration_id": integration_id,
+            "provider": integration["provider"],
+            "previous_status": integration["status"],
+            "status": updated["status"],
+        },
+    )
+
+    return _serialize_integration(updated)
 
 
 @router.post("/api/claws/{claw_id}/integrations/{integration_id}/refresh")
@@ -241,14 +361,30 @@ async def refresh_integration(
     user_id: str = Depends(get_current_user_id),
 ) -> dict[str, Any]:
     verify_claw_ownership(claw_id, user_id)
-    integration = get_integration_for_claw(claw_id, integration_id)
+    integration = _get_integration_for_claw(claw_id, integration_id)
+
+    config_json = dict(integration.get("config_json") or {})
+    config_json["last_refreshed_at"] = utc_now().isoformat()
 
     result = (
         get_supabase()
         .table("integrations")
-        .update({"scope_summary": integration.get("scope_summary") or GITHUB_SCOPE_SUMMARY})
+        .update({"config_json": config_json})
         .eq("id", integration_id)
         .eq("claw_id", claw_id)
         .execute()
     )
-    return result.data[0]
+    updated = result.data[0]
+
+    record_activity_event(
+        claw_id=claw_id,
+        event_type="integration_refreshed",
+        summary="GitHub integration refreshed",
+        metadata={
+            "integration_id": integration_id,
+            "provider": integration["provider"],
+            "status": updated["status"],
+        },
+    )
+
+    return _serialize_integration(updated)

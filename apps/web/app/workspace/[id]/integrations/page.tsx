@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShellCard } from "@launchclaw/ui";
 import { apiFetch } from "@/lib/api";
@@ -11,10 +11,8 @@ type IntegrationItem = {
   claw_id: string;
   provider: string;
   status: string;
+  external_account_ref: string | null;
   scope_summary: string | null;
-  metadata: {
-    installation_id?: number | string;
-  } | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,7 +35,10 @@ function statusBadgeClass(status: string): string {
 
 export default function WorkspaceIntegrationsPage() {
   const { id: clawId } = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const feedbackTimeoutRef = useRef<number | null>(null);
+  const handledCallbackStateRef = useRef(false);
 
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +84,16 @@ export default function WorkspaceIntegrationsPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (handledCallbackStateRef.current || searchParams.get("github") !== "connected") {
+      return;
+    }
+
+    handledCallbackStateRef.current = true;
+    showStatusMessage("GitHub connected");
+    router.replace(`/workspace/${clawId}/integrations`);
+  }, [clawId, router, searchParams, showStatusMessage]);
 
   const handleConnect = async () => {
     try {
@@ -165,7 +176,7 @@ export default function WorkspaceIntegrationsPage() {
         ) : (
           <div className="integration-grid">
             {integrations.map((integration) => {
-              const installationId = integration.metadata?.installation_id;
+              const installationId = integration.external_account_ref;
               const isBusy = busyIntegrationId === integration.id;
               const isConnected = integration.status === "connected";
 
@@ -217,7 +228,7 @@ export default function WorkspaceIntegrationsPage() {
                       <strong title={formatDateTime(integration.updated_at)}>{formatRelativeTime(integration.updated_at)}</strong>
                     </div>
                     <div className="integration-meta-item">
-                      <span>Connected at</span>
+                      <span>Record created</span>
                       <strong title={formatDateTime(integration.created_at)}>{formatDateTime(integration.created_at)}</strong>
                     </div>
                   </div>
