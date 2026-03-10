@@ -11,6 +11,8 @@ const TAB_ICONS: Record<WorkspaceTab, string> = {
   files: "F",
   activity: "A",
   integrations: "I",
+  approvals: "AP",
+  secrets: "SC",
   settings: "S",
 };
 

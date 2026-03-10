@@ -1,9 +1,46 @@
+import type { Approval, ApprovalStatus, Secret } from "@launchclaw/types";
 import { createClient } from "@/lib/supabase/client";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   "http://localhost:8000";
+
+export type ApprovalListResponse = {
+  items: Approval[];
+  next_cursor: string | null;
+};
+
+export type ApprovalListParams = {
+  limit?: number;
+  cursor?: string | null;
+  status?: ApprovalStatus;
+};
+
+export type SecretListResponse = {
+  items: Secret[];
+};
+
+export type UpsertSecretPayload = {
+  provider: string;
+  label: string;
+  value: string;
+};
+
+function buildQueryString(params: Record<string, string | number | null | undefined>): string {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
 
 export async function apiFetch<T = unknown>(
   path: string,
@@ -29,9 +66,50 @@ export async function apiFetch<T = unknown>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    const message = body?.detail?.message || body?.detail || res.statusText;
+    const message =
+      body?.error?.message ||
+      body?.detail?.message ||
+      body?.detail ||
+      res.statusText;
     throw new Error(message);
   }
 
   return res.json();
+}
+
+export function listApprovals(clawId: string, params: ApprovalListParams = {}): Promise<ApprovalListResponse> {
+  return apiFetch<ApprovalListResponse>(
+    `/api/claws/${clawId}/approvals${buildQueryString({
+      limit: params.limit ?? 20,
+      cursor: params.cursor,
+      status: params.status,
+    })}`,
+  );
+}
+
+export function getApproval(approvalId: string): Promise<Approval> {
+  return apiFetch<Approval>(`/api/approvals/${approvalId}`);
+}
+
+export function approveApproval(approvalId: string): Promise<Approval> {
+  return apiFetch<Approval>(`/api/approvals/${approvalId}/approve`, { method: "POST" });
+}
+
+export function denyApproval(approvalId: string): Promise<Approval> {
+  return apiFetch<Approval>(`/api/approvals/${approvalId}/deny`, { method: "POST" });
+}
+
+export function listSecrets(clawId: string): Promise<SecretListResponse> {
+  return apiFetch<SecretListResponse>(`/api/claws/${clawId}/secrets`);
+}
+
+export function upsertSecret(clawId: string, payload: UpsertSecretPayload): Promise<Secret> {
+  return apiFetch<Secret>(`/api/claws/${clawId}/secrets`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function revokeSecret(clawId: string, secretId: string): Promise<Secret> {
+  return apiFetch<Secret>(`/api/claws/${clawId}/secrets/${secretId}`, { method: "DELETE" });
 }

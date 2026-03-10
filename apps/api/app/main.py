@@ -5,12 +5,14 @@ from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.routers.activity import router as activity_router
+from app.routers.approvals import router as approvals_router
 from app.routers.claws import router as claws_router
 from app.routers.integrations import router as integrations_router
 from app.routers.internal import router as internal_router
 from app.routers.lifecycle import router as lifecycle_router
 from app.routers.runs import router as runs_router
 from app.routers.schedules import router as schedules_router
+from app.routers.secrets import router as secrets_router
 from app.routers.workspace_files import router as workspace_files_router
 
 
@@ -35,6 +37,8 @@ app.include_router(schedules_router)
 app.include_router(activity_router)
 app.include_router(workspace_files_router)
 app.include_router(integrations_router)
+app.include_router(approvals_router)
+app.include_router(secrets_router)
 app.include_router(internal_router)
 
 
