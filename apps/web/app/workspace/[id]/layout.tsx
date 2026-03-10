@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { use } from "react";
-import { WORKSPACE_TABS } from "@launchclaw/types";
+import { WORKSPACE_TABS, type WorkspaceTab } from "@launchclaw/types";
 
-const TAB_ICONS: Record<string, string> = {
+const TAB_ICONS: Record<WorkspaceTab, string> = {
   work: "W",
   files: "F",
   activity: "A",
