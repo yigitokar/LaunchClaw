@@ -1,7 +1,7 @@
 # LaunchClaw Build Tracker
 
 ## Current Phase
-Phase 8 — Billing & Hardening
+All phases complete! 🎉
 
 ## Build Order (from PRD)
 
@@ -36,7 +36,7 @@ Phase 8 — Billing & Hardening
 - [x] Build Activity tab UI (event feed)
 - [x] GET /api/claws/:id/activity — activity feed endpoint
 
-### Phase 5: Lifecycle & Scheduling ✅ (PR #5, open 2026-03-09)
+### Phase 5: Lifecycle & Scheduling ✅ (PR #5, merged 2026-03-09)
 - [x] POST pause/resume/restart/recover endpoints
 - [x] Lifecycle state machine enforcement
 - [x] CRUD for schedules
@@ -60,12 +60,12 @@ Phase 8 — Billing & Hardening
 - [x] Secret management UI
 - [x] restart_required flag on rotation
 
-### Phase 8: Billing & Hardening
-- [ ] Stripe checkout session
-- [ ] Billing summary endpoint
-- [ ] Usage tracking
-- [ ] Error handling polish
-- [ ] Security checklist audit
+### Phase 8: Billing & Hardening ✅ (PR #9, merged 2026-03-10)
+- [x] Stripe checkout session
+- [x] Billing summary endpoint
+- [x] Usage tracking
+- [x] Error handling polish
+- [x] Security checklist audit
 
 ## Completed Tasks
 - Phase 1: Data Model & Auth Foundation — PR #1, merged 2026-03-09
@@ -74,6 +74,8 @@ Phase 8 — Billing & Hardening
 - Phase 5: Lifecycle & Scheduling — PR #5, merged 2026-03-09
 - Phase 6: GitHub Integration — PR #7, merged 2026-03-09
 - Phase 7: Approvals & Secrets — PR #8, merged 2026-03-10
+
+- Phase 8: Billing & Hardening — PR #9, merged 2026-03-10
 
 ## Notes
 - FastAPI backend (apps/api) — Python
