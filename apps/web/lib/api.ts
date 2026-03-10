@@ -145,6 +145,13 @@ export function createCheckoutSession(plan: "starter"): Promise<CheckoutResponse
   });
 }
 
+export function syncCheckoutSession(sessionId: string): Promise<BillingSummary> {
+  return apiFetch<BillingSummary>("/api/billing/checkout/sync", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
 export function getUsageSummary(): Promise<UsageSummary> {
   return apiFetch<UsageSummary>("/api/usage/me");
 }

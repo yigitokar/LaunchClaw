@@ -67,7 +67,21 @@ def _resolve_approval(approval_id: str, user_id: str, next_status: str) -> dict[
     updated = items[0]
     run_id = updated.get("run_id")
     if run_id is not None:
-        get_supabase().table("runs").update({"approval_state": next_status}).eq("id", run_id).execute()
+        run_update: dict[str, Any] = {"approval_state": next_status}
+        if next_status == "approved":
+            run_update["status"] = "queued"
+        else:
+            run_update["status"] = "cancelled"
+            run_update["ended_at"] = resolved_at
+
+        (
+            get_supabase()
+            .table("runs")
+            .update(run_update)
+            .eq("id", run_id)
+            .eq("approval_state", "pending")
+            .execute()
+        )
 
     record_activity_event(
         claw_id=updated["claw_id"],

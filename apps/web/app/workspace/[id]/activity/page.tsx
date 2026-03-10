@@ -29,8 +29,11 @@ const EVENT_META: Record<string, { glyph: string; label: string }> = {
   claw_recovered: { glyph: "CV", label: "Claw recovered" },
   claw_restarted: { glyph: "CR", label: "Claw restarted" },
   claw_resumed: { glyph: "CU", label: "Claw resumed" },
+  integration_connect_started: { glyph: "IS", label: "Integration connect started" },
   integration_connected: { glyph: "IC", label: "Integration connected" },
   integration_degraded: { glyph: "ID", label: "Integration degraded" },
+  integration_disconnected: { glyph: "IX", label: "Integration disconnected" },
+  integration_refreshed: { glyph: "IR", label: "Integration refreshed" },
   run_failed: { glyph: "RF", label: "Run failed" },
   run_started: { glyph: "RS", label: "Run started" },
   run_succeeded: { glyph: "RO", label: "Run succeeded" },
@@ -38,6 +41,7 @@ const EVENT_META: Record<string, { glyph: string; label: string }> = {
   schedule_toggled: { glyph: "SG", label: "Schedule toggled" },
   schedule_triggered: { glyph: "ST", label: "Schedule triggered" },
   schedule_updated: { glyph: "SU", label: "Schedule updated" },
+  secret_revoked: { glyph: "SX", label: "Secret revoked" },
   secret_rotated: { glyph: "SR", label: "Secret rotated" },
 };
 

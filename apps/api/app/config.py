@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     supabase_url: str = "http://127.0.0.1:54321"
     supabase_service_key: str = ""
     internal_service_token: str = ""
+    secret_encryption_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("SECRET_ENCRYPTION_KEY", "LAUNCHCLAW_SECRET_ENCRYPTION_KEY"),
+    )
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("STRIPE_SECRET_KEY", "LAUNCHCLAW_STRIPE_SECRET_KEY"),

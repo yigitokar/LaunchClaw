@@ -7,6 +7,11 @@ from pydantic import BaseModel, Field
 from app.auth import get_current_user_id
 from app.db import get_supabase
 from app.routers._helpers import record_activity_event, verify_claw_ownership
+from app.services.secret_crypto import (
+    encrypt_secret_value,
+    secret_encryption_configured,
+    secret_value_needs_migration,
+)
 from app.services.scheduler import utc_now
 
 router = APIRouter(prefix="/api/claws/{claw_id}/secrets", tags=["secrets"])
@@ -86,6 +91,25 @@ def _get_secret_for_claw(claw_id: str, secret_id: str) -> dict[str, Any]:
     return result.data
 
 
+def _migrate_secret_ciphertext(secret: dict[str, Any]) -> dict[str, Any]:
+    stored_value = secret.get("encrypted_value")
+    if not isinstance(stored_value, str) or not secret_value_needs_migration(stored_value):
+        return secret
+    if not secret_encryption_configured():
+        return secret
+
+    result = (
+        get_supabase()
+        .table("secrets")
+        .update({"encrypted_value": encrypt_secret_value(stored_value)})
+        .eq("id", secret["id"])
+        .eq("claw_id", secret["claw_id"])
+        .execute()
+    )
+    items = result.data or []
+    return items[0] if items else secret
+
+
 @router.get("")
 async def list_secrets(claw_id: str, user_id: str = Depends(get_current_user_id)) -> dict[str, list[dict[str, Any]]]:
     verify_claw_ownership(claw_id, user_id)
@@ -93,12 +117,16 @@ async def list_secrets(claw_id: str, user_id: str = Depends(get_current_user_id)
     result = (
         get_supabase()
         .table("secrets")
-        .select(SECRET_RESPONSE_FIELDS)
+        .select(SECRET_DETAIL_FIELDS)
         .eq("claw_id", claw_id)
         .order("created_at", desc=True)
         .execute()
     )
-    return {"items": [_serialize_secret(secret) for secret in (result.data or [])]}
+    items = [
+        _serialize_secret(_migrate_secret_ciphertext(secret))
+        for secret in (result.data or [])
+    ]
+    return {"items": items}
 
 
 @router.post("")
@@ -111,7 +139,7 @@ async def upsert_secret(
 
     provider = _normalize_provider(body.provider)
     label = _normalize_label(body.label)
-    encrypted_value = _validate_value(body.value)
+    encrypted_value = encrypt_secret_value(_validate_value(body.value))
     now_iso = utc_now().isoformat()
     restart_required = _restart_required_for_claw(claw["status"])
 
@@ -120,6 +148,7 @@ async def upsert_secret(
         .table("secrets")
         .select(SECRET_DETAIL_FIELDS)
         .eq("claw_id", claw_id)
+        .eq("provider", provider)
         .eq("label", label)
         .maybe_single()
         .execute()
@@ -189,4 +218,18 @@ async def revoke_secret(
         .eq("claw_id", claw_id)
         .execute()
     )
-    return _serialize_secret(result.data[0])
+    secret = result.data[0]
+
+    record_activity_event(
+        claw_id=claw_id,
+        event_type="secret_revoked",
+        summary=f"Secret revoked: {secret['label']}",
+        metadata={
+            "secret_id": secret["id"],
+            "provider": secret["provider"],
+            "label": secret["label"],
+            "restart_required": restart_required,
+        },
+    )
+
+    return _serialize_secret(secret)

@@ -54,12 +54,26 @@ export type Secret = {
   created_at: string;
 };
 
+export const BILLING_STATUSES = [
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+  "unpaid",
+  "paused",
+  "inactive",
+] as const;
+
+export type BillingStatus = (typeof BILLING_STATUSES)[number];
+
 export interface BillingAccount {
   id: string;
   user_id: string;
   provider: string;
   plan: string;
-  status: string;
+  status: BillingStatus;
   stripe_customer_id: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
@@ -70,9 +84,10 @@ export interface BillingAccount {
 export interface BillingSummary {
   provider: string;
   plan: string;
-  status: string;
+  status: BillingStatus;
   current_period_start: string | null;
   current_period_end: string | null;
+  can_manage_subscription: boolean;
 }
 
 export interface UsageSummary {

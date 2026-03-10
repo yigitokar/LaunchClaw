@@ -669,6 +669,7 @@ code {
 .run-badge--status-denied,
 .run-badge--status-degraded,
 .run-badge--status-past-due,
+.run-badge--status-unpaid,
 .run-badge--status-revoked,
 .run-badge--status-disconnected {
   background: rgba(196, 85, 40, 0.12);
@@ -676,13 +677,17 @@ code {
 }
 
 .run-badge--status-pending,
-.run-badge--status-trialing {
+.run-badge--status-trialing,
+.run-badge--status-paused {
   background: rgba(31, 44, 55, 0.08);
   color: var(--muted);
 }
 
 .run-badge--status-failed,
+.run-badge--status-canceled,
 .run-badge--status-cancelled,
+.run-badge--status-incomplete,
+.run-badge--status-incomplete-expired,
 .run-badge--status-inactive {
   background: rgba(196, 85, 40, 0.12);
   color: #9a461f;

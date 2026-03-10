@@ -31,12 +31,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  const nextPath = `${pathname}${request.nextUrl.search}`;
+  const isProtectedRoute =
+    pathname.startsWith("/app") ||
+    pathname.startsWith("/workspace") ||
+    pathname === "/billing" ||
+    pathname.startsWith("/billing/");
 
-  // Protect /app/* and /workspace/* routes
-  if (!user && (pathname.startsWith("/app") || pathname.startsWith("/workspace"))) {
+  if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", nextPath);
     return NextResponse.redirect(url);
   }
 
@@ -44,5 +49,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/workspace/:path*"],
+  matcher: ["/app/:path*", "/workspace/:path*", "/billing", "/billing/:path*"],
 };

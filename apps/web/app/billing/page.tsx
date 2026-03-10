@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { BillingSummary, UsageSummary } from "@launchclaw/types";
 import { ShellCard } from "@launchclaw/ui";
-import { ApiError, createCheckoutSession, getBillingSummary, getUsageSummary } from "@/lib/api";
+import { ApiError, createCheckoutSession, getBillingSummary, getUsageSummary, syncCheckoutSession } from "@/lib/api";
 import { formatDateTime } from "@/lib/time";
 
 function formatCost(amount: number): string {
   return `$${amount.toFixed(2)}`;
+}
+
+function formatStatus(status: string): string {
+  return status.replace(/_/g, " ");
 }
 
 function statusBadgeClass(status: string): string {
@@ -16,22 +21,32 @@ function statusBadgeClass(status: string): string {
 }
 
 export default function BillingPage() {
+  const searchParams = useSearchParams();
+  const checkoutState = searchParams.get("checkout");
+  const checkoutSessionId = searchParams.get("session_id");
   const [billing, setBilling] = useState<BillingSummary | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
   const [billingMissing, setBillingMissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const shouldSyncCheckout = checkoutState === "success" && Boolean(checkoutSessionId);
 
     async function loadBillingState() {
       try {
         setLoading(true);
         setError(null);
+        setNotice(checkoutState === "cancelled" ? "Stripe checkout was cancelled before completion." : null);
 
-        const [billingResult, usageResult] = await Promise.allSettled([getBillingSummary(), getUsageSummary()]);
+        const billingRequest = shouldSyncCheckout && checkoutSessionId
+          ? syncCheckoutSession(checkoutSessionId)
+          : getBillingSummary();
+
+        const [billingResult, usageResult] = await Promise.allSettled([billingRequest, getUsageSummary()]);
         if (cancelled) {
           return;
         }
@@ -39,6 +54,9 @@ export default function BillingPage() {
         if (billingResult.status === "fulfilled") {
           setBilling(billingResult.value);
           setBillingMissing(false);
+          if (shouldSyncCheckout) {
+            setNotice("Subscription synced from your completed Stripe checkout.");
+          }
         } else if (billingResult.reason instanceof ApiError && billingResult.reason.status === 404) {
           setBilling(null);
           setBillingMissing(true);
@@ -58,6 +76,10 @@ export default function BillingPage() {
             (usageResult.reason instanceof Error ? usageResult.reason.message : "Failed to load usage summary"),
           );
         }
+
+        if (checkoutState === "success" && !checkoutSessionId) {
+          setError((current) => current || "Stripe redirect did not include a checkout session ID.");
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -70,9 +92,9 @@ export default function BillingPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [checkoutSessionId, checkoutState]);
 
-  const handleUpgrade = async () => {
+  const handleBillingAction = async () => {
     try {
       setUpgrading(true);
       setError(null);
@@ -83,6 +105,8 @@ export default function BillingPage() {
       setUpgrading(false);
     }
   };
+
+  const actionLabel = billing?.can_manage_subscription ? "Manage subscription" : "Upgrade";
 
   return (
     <main className="app-shell stack">
@@ -113,7 +137,7 @@ export default function BillingPage() {
               </div>
               <div className="table-row">
                 <strong>Status</strong>
-                <span className={statusBadgeClass(billing.status)}>{billing.status}</span>
+                <span className={statusBadgeClass(billing.status)}>{formatStatus(billing.status)}</span>
               </div>
               <div className="table-row">
                 <strong>Current period start</strong>
@@ -131,8 +155,8 @@ export default function BillingPage() {
           )}
 
           <div className="nav-row" style={{ marginTop: "0.75rem", paddingBottom: 0 }}>
-            <button className="editor-save" type="button" onClick={handleUpgrade} disabled={upgrading}>
-              {upgrading ? "Redirecting..." : "Upgrade"}
+            <button className="editor-save" type="button" onClick={handleBillingAction} disabled={upgrading}>
+              {upgrading ? "Redirecting..." : actionLabel}
             </button>
           </div>
         </ShellCard>
@@ -160,6 +184,12 @@ export default function BillingPage() {
           )}
         </ShellCard>
       </section>
+
+      {notice ? (
+        <ShellCard title="Status" description="Recent billing state from Stripe.">
+          <p className="muted">{notice}</p>
+        </ShellCard>
+      ) : null}
 
       {error ? (
         <ShellCard title="Error" description="One or more billing calls failed.">

@@ -13,6 +13,7 @@ from app.auth import get_current_user_id
 from app.config import settings
 from app.db import get_supabase
 from app.routers._helpers import record_activity_event, verify_claw_ownership
+from app.services.github_app import get_github_app_installation, require_github_app_credentials
 from app.services.scheduler import utc_now
 
 router = APIRouter(tags=["integrations"])
@@ -52,6 +53,10 @@ def _github_install_url(state_token: str) -> str:
 
 def _workspace_redirect_url(claw_id: str) -> str:
     return f"{settings.cors_origin.rstrip('/')}/workspace/{claw_id}/integrations?github=connected"
+
+
+def _next_connect_status(current_status: str | None) -> str:
+    return current_status if current_status in {"connected", "degraded"} else "pending"
 
 
 def _encode_state_bytes(raw_value: bytes) -> str:
@@ -193,6 +198,7 @@ async def connect_github_integration(
 ) -> dict[str, str]:
     verify_claw_ownership(claw_id, user_id)
     _state_secret()
+    require_github_app_credentials()
 
     integration = _get_latest_github_integration_for_claw(claw_id)
     if integration is None:
@@ -216,13 +222,15 @@ async def connect_github_integration(
     config_json = dict(integration.get("config_json") or {})
     config_json[PENDING_STATE_TOKEN_KEY] = state_token
     config_json[PENDING_STATE_EXPIRES_AT_KEY] = expires_at
+    config_json["pending_connect_started_at"] = utc_now().isoformat()
+    next_status = _next_connect_status(integration.get("status"))
 
     (
         get_supabase()
         .table("integrations")
         .update(
             {
-                "status": "pending",
+                "status": next_status,
                 "scope_summary": GITHUB_SCOPE_SUMMARY,
                 "config_json": config_json,
             }
@@ -276,10 +284,20 @@ async def github_callback(
             detail=_detail("validation_error", "GitHub state token does not match the active install flow"),
         )
 
+    installation = get_github_app_installation(installation_id)
+    account = installation.get("account") if isinstance(installation, dict) else None
+
     config_json.pop(PENDING_STATE_TOKEN_KEY, None)
     config_json.pop(PENDING_STATE_EXPIRES_AT_KEY, None)
+    config_json.pop("pending_connect_started_at", None)
     config_json["installation_id"] = installation_id
     config_json["last_connected_at"] = utc_now().isoformat()
+    config_json["repository_selection"] = installation.get("repository_selection")
+    config_json["permissions"] = installation.get("permissions")
+    config_json["target_type"] = installation.get("target_type")
+    if isinstance(account, dict):
+        config_json["account_login"] = account.get("login")
+        config_json["account_type"] = account.get("type")
     if setup_action:
         config_json["setup_action"] = setup_action
 
@@ -308,6 +326,7 @@ async def github_callback(
             "integration_id": integration_id,
             "provider": GITHUB_PROVIDER,
             "installation_id": installation_id,
+            "account_login": config_json.get("account_login"),
             "status": updated["status"],
         },
     )
