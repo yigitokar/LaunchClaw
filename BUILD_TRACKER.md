@@ -1,7 +1,7 @@
 # LaunchClaw Build Tracker
 
 ## Current Phase
-Phase 7 — Approvals & Secrets
+Phase 8 — Billing & Hardening
 
 ## Build Order (from PRD)
 
@@ -52,13 +52,13 @@ Phase 7 — Approvals & Secrets
 - [x] Internal token minting endpoint
 - [x] Integrations tab in workspace
 
-### Phase 7: Approvals & Secrets
-- [ ] Approval CRUD endpoints
-- [ ] Approve/deny flow
-- [ ] Approval UI in workspace
-- [ ] Secret create/revoke endpoints
-- [ ] Secret management UI
-- [ ] restart_required flag on rotation
+### Phase 7: Approvals & Secrets ✅ (PR #8, merged 2026-03-10)
+- [x] Approval CRUD endpoints
+- [x] Approve/deny flow
+- [x] Approval UI in workspace
+- [x] Secret create/revoke endpoints
+- [x] Secret management UI
+- [x] restart_required flag on rotation
 
 ### Phase 8: Billing & Hardening
 - [ ] Stripe checkout session
@@ -73,6 +73,7 @@ Phase 7 — Approvals & Secrets
 - Phase 3: Workspace Shell & Files — PR #3, merged 2026-03-09
 - Phase 5: Lifecycle & Scheduling — PR #5, merged 2026-03-09
 - Phase 6: GitHub Integration — PR #7, merged 2026-03-09
+- Phase 7: Approvals & Secrets — PR #8, merged 2026-03-10
 
 ## Notes
 - FastAPI backend (apps/api) — Python
