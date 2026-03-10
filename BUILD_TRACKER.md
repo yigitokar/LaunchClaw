@@ -1,7 +1,7 @@
 # LaunchClaw Build Tracker
 
 ## Current Phase
-Phase 6 — GitHub Integration
+Phase 7 — Approvals & Secrets
 
 ## Build Order (from PRD)
 
@@ -44,13 +44,13 @@ Phase 6 — GitHub Integration
 - [x] Scheduler service (scan due, create runs)
 - [x] Scheduling UI in workspace settings
 
-### Phase 6: GitHub Integration
-- [ ] GitHub App setup docs
-- [ ] POST /api/claws/:id/integrations/github/connect
-- [ ] GitHub OAuth callback handler
-- [ ] Integration status & disconnect
-- [ ] Internal token minting endpoint
-- [ ] Integrations tab in workspace
+### Phase 6: GitHub Integration ✅ (PR #7, merged 2026-03-09)
+- [x] GitHub App setup docs
+- [x] POST /api/claws/:id/integrations/github/connect
+- [x] GitHub OAuth callback handler
+- [x] Integration status & disconnect
+- [x] Internal token minting endpoint
+- [x] Integrations tab in workspace
 
 ### Phase 7: Approvals & Secrets
 - [ ] Approval CRUD endpoints
@@ -71,7 +71,8 @@ Phase 6 — GitHub Integration
 - Phase 1: Data Model & Auth Foundation — PR #1, merged 2026-03-09
 - Phase 2: Claw CRUD & Create Flow — PR #2, merged 2026-03-09
 - Phase 3: Workspace Shell & Files — PR #3, merged 2026-03-09
-- Phase 5: Lifecycle & Scheduling — PR #5, open 2026-03-09
+- Phase 5: Lifecycle & Scheduling — PR #5, merged 2026-03-09
+- Phase 6: GitHub Integration — PR #7, merged 2026-03-09
 
 ## Notes
 - FastAPI backend (apps/api) — Python
